@@ -92,6 +92,18 @@ y cada push a `main` lo redespliega. La raíz `/` redirige a `/docs`.
 En el plan gratuito el servicio se duerme tras un rato sin visitas (la primera petición tarda
 unos segundos) y `logs/predicciones.jsonl` se pierde en cada redespliegue.
 
+## Web
+
+`web/index.html` es una página estática (HTML + JS, sin compilar) que llama a la API: eliges un día,
+la temperatura, la lluvia y si hay evento, y muestra los clientes por hora, la hora punta y la
+comparación con un día sin lluvia ni evento. Puede usar el tiempo real de Granada (Open-Meteo) y
+guarda el escenario en la URL para compartirlo.
+
+- **En local:** `python -m http.server 5500 --directory web` y abre
+  `http://localhost:5500/?api=http://localhost:8000`.
+- **En Vercel:** Add New → Project → este repo, con *Root Directory* `web` y sin framework.
+  Por defecto llama a `https://aforo-api.onrender.com`; la API permite CORS (variable `CORS_ORIGINS`).
+
 ## Ejemplo de petición
 
 ```json

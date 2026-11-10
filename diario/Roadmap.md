@@ -29,7 +29,9 @@ Leyenda: [x] hecho · [/] a medias · [ ] pendiente · [-] descartado
 ## Fase 3 · Producción de verdad
 - [x] Imagen ligera de la API sin MLflow (modelo exportado en `modelo/`) y `render.yaml`
 - [x] Desplegar la API en Render: https://aforo-api.onrender.com
-- [ ] Previsión meteorológica real (AEMET u Open-Meteo) para predecir los próximos 7 días
+- [x] Previsión meteorológica real (Open-Meteo) en la web
+- [x] Web estática (`web/`) con la curva de clientes del día, escenarios y CORS en la API
+- [ ] Publicar la web en Vercel
 - [ ] Endpoint `/predecir/dia` que construya las 16 horas de un día a partir de la previsión
 - [ ] Autenticación por API key y rate limiting
 

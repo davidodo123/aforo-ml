@@ -88,3 +88,13 @@ def test_sin_aviso_dentro_del_entrenamiento(cliente):
         {"fecha_hora": "2026-11-14T21:00:00", "temperatura": 15},
     ]})
     assert r.json()["avisos"] == []
+
+
+def test_cors_permite_la_web(cliente):
+    r = cliente.options("/predecir", headers={
+        "Origin": "https://aforo.vercel.app",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Content-Type",
+    })
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] in ("*", "https://aforo.vercel.app")

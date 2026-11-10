@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aforo · previsión de clientes</title>
+<meta name="description" content="Predicción de clientes por hora de un bar-cafetería en Granada con un modelo de machine learning.">
+<style>
+  :root {
+    color-scheme: light;
+    --plane: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #6f6d68;
+    --axis-text: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --series: #2a78d6;
+    --series-wash: rgba(42, 120, 214, 0.10);
+    --reference: #898781;
+    --accent: #2a78d6;
+    --accent-ink: #ffffff;
+    --critical: #d03b3b;
+    --good: #0ca30c;
+    --focus: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #f0efec;
+      --ink-2: #c3c2b7;
+      --muted: #a3a29b;
+      --axis-text: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --series: #3987e5;
+      --series-wash: rgba(57, 135, 229, 0.12);
+      --reference: #898781;
+      --accent: #3987e5;
+      --focus: #6da7ec;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #a3a29b;
+    --axis-text: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --series: #3987e5;
+    --series-wash: rgba(57, 135, 229, 0.12);
+    --reference: #898781;
+    --accent: #3987e5;
+    --focus: #6da7ec;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--plane);
+    color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; margin-bottom: 24px; }
+  h1 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); margin: 4px 0 0; max-width: 60ch; }
+  .estado { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+  .estado::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--axis-text); }
+  .estado[data-s="ok"]::before { background: var(--good); }
+  .estado[data-s="error"]::before { background: var(--critical); }
+  .estado[data-s="espera"]::before { animation: latido 1.2s ease-in-out infinite; }
+  @keyframes latido { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .estado[data-s="espera"]::before { animation: none; } }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .panel + .panel { margin-top: 16px; }
+
+  /* Controles */
+  .controles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px 20px; align-items: end; }
+  label, .etiqueta { display: block; font-size: 13px; font-weight: 550; color: var(--ink-2); margin-bottom: 6px; }
+  input[type="date"], select {
+    width: 100%; height: 40px; padding: 0 10px; font: inherit; color: var(--ink);
+    background: var(--plane); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .rango { display: flex; align-items: center; gap: 10px; }
+  .rango input { flex: 1; accent-color: var(--accent); height: 40px; }
+  .rango output { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .check { display: flex; align-items: center; gap: 10px; height: 40px; cursor: pointer; color: var(--ink); font-size: 15px; font-weight: 400; margin: 0; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; align-items: center; }
+  button {
+    height: 36px; padding: 0 14px; font: inherit; font-size: 14px; border-radius: 8px; cursor: pointer;
+    background: transparent; color: var(--ink); border: 1px solid var(--border);
+  }
+  button:hover { background: var(--series-wash); }
+  button:disabled { opacity: .5; cursor: default; background: transparent; }
+  :is(button, input, select, summary):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .nota { font-size: 13px; color: var(--muted); }
+
+  /* Cifras */
+  .cifras { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .cifra .k { font-size: 13px; color: var(--ink-2); }
+  .cifra .v { font-size: 28px; font-weight: 600; line-height: 1.2; }
+  .cifra.hero .v { font-size: 48px; }
+  .cifra .d { font-size: 13px; color: var(--ink-2); }
+  @media (max-width: 560px) {
+    .cifras { grid-template-columns: 1fr 1fr; }
+    .cifra.hero { grid-column: 1 / -1; }
+  }
+
+  /* Gráfica */
+  .titulo-grafica { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 8px; }
+  .titulo-grafica h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .leyenda { display: flex; gap: 16px; font-size: 13px; color: var(--ink-2); }
+  .leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .leyenda .sw-col { width: 10px; height: 12px; border-radius: 3px 3px 0 0; background: var(--series); }
+  .leyenda .sw-lin { width: 16px; height: 2px; border-radius: 1px; background: var(--reference); }
+  .grafica { position: relative; }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .eje text { fill: var(--axis-text); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .tip {
+    position: absolute; pointer-events: none; background: var(--surface); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.12); white-space: nowrap; transform: translate(-50%, -100%);
+    opacity: 0; transition: opacity .1s;
+  }
+  .tip b { font-weight: 600; }
+  .tip .fila { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
+  .avisos { margin: 12px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink-2); }
+  .avisos li::before { content: "Ojo: "; font-weight: 600; color: var(--ink); }
+  .vacio { padding: 64px 0; text-align: center; color: var(--muted); }
+
+  details { margin-top: 16px; font-size: 14px; }
+  summary { cursor: pointer; color: var(--ink-2); }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-weight: 550; color: var(--ink-2); }
+  .tabla-scroll { overflow-x: auto; }
+
+  footer { margin-top: 24px; font-size: 13px; color: var(--muted); }
+  footer a { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Aforo</h1>
+      <p class="sub">Clientes previstos por hora en un bar-cafetería de Granada. Elige un día y el tiempo que hará; un modelo de machine learning hace la previsión.</p>
+    </div>
+    <span class="estado" id="estado" data-s="espera" role="status">Conectando con el modelo…</span>
+  </header>
+
+  <section class="panel" aria-label="Escenario">
+    <div class="controles">
+      <div>
+        <label for="fecha">Día</label>
+        <input type="date" id="fecha" min="2024-01-01" max="2026-12-31">
+      </div>
+      <div>
+        <label for="temp">Temperatura media</label>
+        <div class="rango">
+          <input type="range" id="temp" min="0" max="38" step="1" value="16">
+          <output id="temp-v" for="temp">16 ºC</output>
+        </div>
+      </div>
+      <div>
+        <label for="lluvia">Lluvia</label>
+        <select id="lluvia">
+          <option value="0">Sin lluvia</option>
+          <option value="1.5">Lluvia débil</option>
+          <option value="4">Lluvia fuerte</option>
+        </select>
+      </div>
+      <div>
+        <span class="etiqueta">Por la noche</span>
+        <label class="check"><input type="checkbox" id="evento"> Partido o concierto</label>
+      </div>
+    </div>
+    <div class="acciones">
+      <button type="button" id="b-prevision">Usar el tiempo real de Granada</button>
+      <span class="nota" id="nota-tiempo">Temperatura y lluvia a mano.</span>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="t-grafica">
+    <div class="cifras" id="cifras" aria-live="polite">
+      <div class="cifra hero"><div class="k">Clientes en el día</div><div class="v" id="c-total">—</div><div class="d" id="c-total-d">&nbsp;</div></div>
+      <div class="cifra"><div class="k">Hora punta</div><div class="v" id="c-punta">—</div><div class="d" id="c-punta-d">&nbsp;</div></div>
+      <div class="cifra"><div class="k">Franja más fuerte</div><div class="v" id="c-franja">—</div><div class="d" id="c-franja-d">&nbsp;</div></div>
+    </div>
+
+    <div class="titulo-grafica">
+      <h2 id="t-grafica">Clientes por hora</h2>
+      <div class="leyenda" id="leyenda" hidden>
+        <span><i class="sw-col"></i>Escenario elegido</span>
+        <span><i class="sw-lin"></i>Sin lluvia ni evento</span>
+      </div>
+    </div>
+    <div class="grafica" id="grafica"><div class="vacio">Cargando…</div></div>
+    <ul class="avisos" id="avisos"></ul>
+
+    <details>
+      <summary>Ver los datos en tabla</summary>
+      <div class="tabla-scroll"><table id="tabla"></table></div>
+    </details>
+  </section>
+
+  <footer>
+    Datos sintéticos con patrones realistas · Modelo: tendencia + LightGBM Poisson, servido con FastAPI ·
+    <a id="enlace-api" href="https://aforo-api.onrender.com/docs">API</a> ·
+    <a href="https://github.com/davidodo123/aforo-ml">Código</a> ·
+    Tiempo: <a href="https://open-meteo.com/">Open-Meteo</a>
+  </footer>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  // ?api=http://localhost:8000 para probar contra la API local.
+  const API = (new URLSearchParams(location.search).get("api") || "https://aforo-api.onrender.com").replace(/\/$/, "");
+  document.getElementById("enlace-api").href = API + "/docs";
+
+  const GRANADA = { lat: 37.18, lon: -3.60 };
+  const HORAS = Array.from({ length: 16 }, (_, i) => 8 + i); // 8:00 a 23:00
+  const NOCHE_EVENTO = h => h >= 19; // en los datos, los eventos suben de 19 a 23 h
+
+  const $ = id => document.getElementById(id);
+  const el = { fecha: $("fecha"), temp: $("temp"), tempV: $("temp-v"), lluvia: $("lluvia"), evento: $("evento"),
+               bPrev: $("b-prevision"), notaT: $("nota-tiempo"), estado: $("estado"), grafica: $("grafica"),
+               leyenda: $("leyenda"), avisos: $("avisos"), tabla: $("tabla") };
+
+  const fmt = n => Math.round(n).toLocaleString("es-ES");
+  const iso = d => d.toISOString().slice(0, 10);
+  const pad = h => String(h).padStart(2, "0");
+
+  // Tiempo horario: a mano (curva diaria típica) o real (Open-Meteo).
+  let tiempoReal = null; // { fecha, temp: [16], lluvia: [16] }
+
+  function tiempoManual() {
+    const media = Number(el.temp.value);
+    const mm = Number(el.lluvia.value);
+    // Misma forma diaria que el generador de datos: máximo hacia las 15-16 h.
+    return {
+      temp: HORAS.map(h => +(media + 6 * Math.sin(2 * Math.PI * (h - 9) / 24)).toFixed(1)),
+      lluvia: HORAS.map(() => mm),
+    };
+  }
+
+  function tiempoActual() {
+    return tiempoReal && tiempoReal.fecha === el.fecha.value ? tiempoReal : tiempoManual();
+  }
+
+  function estado(s, texto) { el.estado.dataset.s = s; el.estado.textContent = texto; }
+
+  // ---------- API ----------
+  async function llamar(ruta, opciones = {}, ms = 70000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const r = await fetch(API + ruta, { ...opciones, signal: ctrl.signal });
+      const cuerpo = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg = Array.isArray(cuerpo.detail) ? cuerpo.detail.map(d => d.msg.replace(/^Value error, /, "")).join(" · ")
+                                                  : (cuerpo.detail || `Error ${r.status}`);
+        throw new Error(msg);
+      }
+      return cuerpo;
+    } finally { clearTimeout(t); }
+  }
+
+  async function despertar() {
+    estado("espera", "Conectando con el modelo…");
+    const lento = setTimeout(() => estado("espera", "Despertando el servidor (puede tardar hasta un minuto)…"), 2500);
+    try {
+      await llamar("/health");
+      estado("ok", "Modelo en línea");
+      return true;
+    } catch (e) {
+      estado("error", "No se pudo conectar con el modelo");
+      return false;
+    } finally { clearTimeout(lento); }
+  }
+
+  let peticion = 0;
+  async function prever() {
+    const fecha = el.fecha.value;
+    if (!fecha) return;
+    const id = ++peticion;
+    const t = tiempoActual();
+    const conExtras = t.lluvia.some(v => v > 0.5) || el.evento.checked;
+
+    const horas = (lluvia, evento) => HORAS.map((h, i) => ({
+      fecha_hora: `${fecha}T${pad(h)}:00:00`,
+      temperatura: t.temp[i],
+      lluvia_mm: lluvia ? t.lluvia[i] : 0,
+      evento: evento && NOCHE_EVENTO(h),
+    }));
+    const cuerpo = { horas: horas(true, el.evento.checked) };
+    if (conExtras) cuerpo.horas.push(...horas(false, false));
+
+    el.grafica.setAttribute("aria-busy", "true");
+    try {
+      const r = await llamar("/predecir", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo),
+      });
+      if (id !== peticion) return; // llegó una respuesta más nueva
+      const p = r.predicciones.map(x => x.clientes);
+      const escenario = p.slice(0, 16);
+      const referencia = conExtras ? p.slice(16) : null;
+      estado("ok", "Modelo en línea");
+      pintar(escenario, referencia, t);
+      el.avisos.innerHTML = "";
+      if ((r.avisos || []).length) { // la API avisa si la fecha es posterior a los datos de entrenamiento
+        const li = document.createElement("li");
+        li.textContent = "esta fecha es posterior a los datos con los que se entrenó el modelo: el crecimiento del local se extrapola y la previsión es menos segura.";
+        el.avisos.append(li);
+      }
+    } catch (e) {
+      if (id !== peticion) return;
+      estado("error", "Error al predecir");
+      el.grafica.innerHTML = `<div class="vacio">${e.name === "AbortError" ? "El servidor no ha respondido a tiempo. Prueba otra vez en unos segundos." : escapar(e.message)}</div>`;
+      limpiarCifras();
+    } finally { el.grafica.removeAttribute("aria-busy"); }
+  }
+
+  const escapar = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // ---------- Cifras ----------
+  function limpiarCifras() {
+    for (const k of ["c-total", "c-punta", "c-franja"]) $(k).textContent = "—";
+    for (const k of ["c-total-d", "c-punta-d", "c-franja-d"]) $(k).innerHTML = "&nbsp;";
+  }
+
+  function cifras(esc, ref) {
+    const total = esc.reduce((a, b) => a + b, 0);
+    $("c-total").textContent = fmt(total);
+    if (ref) {
+      const totalRef = ref.reduce((a, b) => a + b, 0);
+      const dif = (total / totalRef - 1) * 100;
+      $("c-total-d").textContent = `${dif >= 0 ? "+" : "−"}${Math.abs(dif).toFixed(0)} % frente a un día sin lluvia ni evento`;
+    } else {
+      $("c-total-d").textContent = fechaLarga(el.fecha.value);
+    }
+    const iMax = esc.indexOf(Math.max(...esc));
+    $("c-punta").textContent = `${HORAS[iMax]}:00`;
+    $("c-punta-d").textContent = `${fmt(esc[iMax])} clientes`;
+    // Franja de 3 horas seguidas con más clientes.
+    let mejor = 0, iF = 0;
+    for (let i = 0; i + 2 < esc.length; i++) {
+      const s = esc[i] + esc[i + 1] + esc[i + 2];
+      if (s > mejor) { mejor = s; iF = i; }
+    }
+    $("c-franja").textContent = `${HORAS[iF]}–${HORAS[iF] + 3} h`;
+    $("c-franja-d").textContent = `${fmt(mejor)} clientes en 3 horas`;
+  }
+
+  function fechaLarga(f) {
+    const d = new Date(f + "T12:00:00");
+    return d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  }
+
+  // ---------- Gráfica (SVG a mano) ----------
+  function pasoBonito(max) {
+    const bruto = max / 4;
+    const mag = 10 ** Math.floor(Math.log10(bruto));
+    return [1, 2, 2.5, 5, 10].map(m => m * mag).find(p => p >= bruto);
+  }
+
+  function pintar(esc, ref, t) {
+    cifras(esc, ref);
+    el.leyenda.hidden = !ref;
+
+    const W = Math.max(320, el.grafica.clientWidth || 800), H = W < 520 ? 240 : 300;
+    const m = { t: 22, r: 8, b: 26, l: 34 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const maxV = Math.max(...esc, ...(ref || [0]));
+    const paso = pasoBonito(maxV * 1.08);
+    const techo = Math.ceil((maxV * 1.08) / paso) * paso;
+    const y = v => m.t + ih - (v / techo) * ih;
+    const banda = iw / HORAS.length;
+    const ancho = Math.min(24, banda * 0.62);
+    const cx = i => m.l + banda * i + banda / 2;
+
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Clientes previstos por hora el ${escapar(fechaLarga(el.fecha.value))}">`;
+    // Rejilla y eje Y
+    s += `<g class="eje">`;
+    for (let v = 0; v <= techo + 1e-9; v += paso) {
+      s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(${v === 0 ? "--baseline" : "--grid"})" stroke-width="1"/>`;
+      s += `<text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${fmt(v)}</text>`;
+    }
+    const cadaX = W < 520 ? 3 : 1;
+    HORAS.forEach((h, i) => { if (i % cadaX === 0) s += `<text x="${cx(i)}" y="${H - 6}" text-anchor="middle">${h}</text>`; });
+    s += `</g>`;
+
+    // Columnas: 4 px redondeadas arriba, rectas en la base.
+    esc.forEach((v, i) => {
+      const x0 = cx(i) - ancho / 2, y0 = y(v), alto = m.t + ih - y0, r = Math.min(4, alto, ancho / 2);
+      s += `<path fill="var(--series)" d="M${x0},${m.t + ih} V${y0 + r} Q${x0},${y0} ${x0 + r},${y0} H${x0 + ancho - r} Q${x0 + ancho},${y0} ${x0 + ancho},${y0 + r} V${m.t + ih} Z"/>`;
+    });
+
+    // Línea de referencia
+    if (ref) {
+      const pts = ref.map((v, i) => `${cx(i)},${y(v)}`).join(" ");
+      s += `<polyline points="${pts}" fill="none" stroke="var(--surface)" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      s += `<polyline points="${pts}" fill="none" stroke="var(--reference)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    }
+
+    // Etiqueta solo en la hora punta.
+    const iMax = esc.indexOf(Math.max(...esc));
+    const yEtiqueta = y(Math.max(esc[iMax], ref ? ref[iMax] : 0)) - 8;
+    s += `<text x="${cx(iMax)}" y="${yEtiqueta}" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">${fmt(esc[iMax])}</text>`;
+
+    // Zonas de hover (toda la banda, más grandes que la columna).
+    HORAS.forEach((_, i) => {
+      s += `<rect class="hit" data-i="${i}" x="${m.l + banda * i}" y="${m.t}" width="${banda}" height="${ih}" fill="transparent" tabindex="-1"/>`;
+    });
+    s += `<line id="guia" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" stroke="var(--baseline)" stroke-width="1" opacity="0"/>`;
+    s += `</svg><div class="tip" id="tip"></div>`;
+    el.grafica.innerHTML = s;
+
+    // Tooltip
+    const svg = el.grafica.querySelector("svg"), tip = $("tip"), guia = $("guia");
+    const mostrar = i => {
+      const escala = el.grafica.clientWidth / W;
+      guia.setAttribute("x1", cx(i)); guia.setAttribute("x2", cx(i)); guia.setAttribute("opacity", 1);
+      let html = `<b>${HORAS[i]}:00 – ${HORAS[i]}:59</b>`;
+      html += `<div class="fila"><span class="leyenda"><i class="sw-col"></i></span>${fmt(esc[i])} clientes</div>`;
+      if (ref) html += `<div class="fila"><span class="leyenda"><i class="sw-lin"></i></span>${fmt(ref[i])} sin lluvia ni evento</div>`;
+      html += `<div class="fila">${t.temp[i].toFixed(0)} ºC${t.lluvia[i] > 0.5 ? ` · ${t.lluvia[i].toFixed(1)} mm` : ""}</div>`;
+      tip.innerHTML = html;
+      const izq = Math.min(Math.max(cx(i) * escala, 90), el.grafica.clientWidth - 90);
+      tip.style.left = izq + "px";
+      tip.style.top = (y(Math.max(esc[i], ref ? ref[i] : 0)) * escala - 10) + "px";
+      tip.style.opacity = 1;
+    };
+    const ocultar = () => { tip.style.opacity = 0; guia.setAttribute("opacity", 0); };
+    svg.querySelectorAll(".hit").forEach(r => {
+      r.addEventListener("pointerenter", () => mostrar(+r.dataset.i));
+      r.addEventListener("pointerdown", () => mostrar(+r.dataset.i));
+    });
+    svg.addEventListener("pointerleave", ocultar);
+
+    // Tabla accesible
+    let tb = `<thead><tr><th>Hora</th><th>Clientes</th>${ref ? "<th>Sin lluvia ni evento</th>" : ""}<th>ºC</th><th>Lluvia (mm)</th></tr></thead><tbody>`;
+    HORAS.forEach((h, i) => {
+      tb += `<tr><td>${h}:00</td><td>${esc[i].toFixed(1)}</td>${ref ? `<td>${ref[i].toFixed(1)}</td>` : ""}<td>${t.temp[i].toFixed(1)}</td><td>${t.lluvia[i].toFixed(1)}</td></tr>`;
+    });
+    el.tabla.innerHTML = tb + "</tbody>";
+    ultimo = { esc, ref, t };
+  }
+
+  let ultimo = null;
+  let redim;
+  addEventListener("resize", () => {
+    clearTimeout(redim);
+    redim = setTimeout(() => ultimo && pintar(ultimo.esc, ultimo.ref, ultimo.t), 150);
+  });
+
+  // ---------- Tiempo real (Open-Meteo) ----------
+  async function cargarTiempoReal() {
+    const fecha = el.fecha.value;
+    const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
+    const dias = Math.round((new Date(fecha + "T12:00:00") - hoy) / 86400000);
+    if (dias > 15) {
+      el.notaT.textContent = "La previsión solo llega a 16 días vista; para esta fecha, ajusta el tiempo a mano.";
+      return;
+    }
+    // Previsión (incluye los últimos ~3 meses) o histórico para fechas más antiguas.
+    const base = dias >= -80 ? "https://api.open-meteo.com/v1/forecast" : "https://archive-api.open-meteo.com/v1/archive";
+    const url = `${base}?latitude=${GRANADA.lat}&longitude=${GRANADA.lon}&hourly=temperature_2m,precipitation` +
+                `&timezone=Europe%2FMadrid&start_date=${fecha}&end_date=${fecha}`;
+    el.bPrev.disabled = true;
+    el.notaT.textContent = "Consultando el tiempo…";
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(r.status);
+      const d = (await r.json()).hourly;
+      const temp = HORAS.map(h => d.temperature_2m[h]);
+      const lluvia = HORAS.map(h => d.precipitation[h] ?? 0);
+      if (temp.some(v => v == null)) throw new Error("sin datos");
+      tiempoReal = { fecha, temp, lluvia };
+      const media = temp.reduce((a, b) => a + b, 0) / temp.length;
+      const mm = lluvia.reduce((a, b) => a + b, 0);
+      el.notaT.textContent = `${dias >= 0 ? "Previsión" : "Tiempo registrado"} en Granada: ${media.toFixed(0)} ºC de media` +
+                             `${mm > 0.5 ? `, ${mm.toFixed(1)} mm de lluvia` : ", sin lluvia"}. Si tocas temperatura o lluvia, vuelves al modo manual.`;
+      el.temp.value = Math.round(media); el.tempV.textContent = `${Math.round(media)} ºC`;
+      prever();
+    } catch {
+      el.notaT.textContent = "No se pudo obtener el tiempo de Open-Meteo; ajústalo a mano.";
+    } finally { el.bPrev.disabled = false; }
+  }
+
+  function aManual() {
+    if (tiempoReal) { tiempoReal = null; el.notaT.textContent = "Temperatura y lluvia a mano."; }
+  }
+
+  // ---------- Eventos ----------
+  let espera;
+  const preverPronto = () => { clearTimeout(espera); espera = setTimeout(prever, 250); };
+  el.temp.addEventListener("input", () => { el.tempV.textContent = `${el.temp.value} ºC`; aManual(); preverPronto(); });
+  el.lluvia.addEventListener("change", () => { aManual(); prever(); });
+  el.evento.addEventListener("change", prever);
+  el.fecha.addEventListener("change", () => { aManual(); prever(); });
+  el.bPrev.addEventListener("click", cargarTiempoReal);
+
+  // Escenario en la URL (?fecha=2026-11-14&temp=16&lluvia=4&evento=1) para poder compartirlo.
+  function guardarEnURL() {
+    const q = new URLSearchParams(location.search);
+    q.set("fecha", el.fecha.value);
+    q.set("temp", el.temp.value);
+    q.set("lluvia", el.lluvia.value);
+    if (el.evento.checked) q.set("evento", "1"); else q.delete("evento");
+    history.replaceState(null, "", "?" + q.toString());
+  }
+  for (const c of [el.fecha, el.temp, el.lluvia, el.evento]) c.addEventListener("change", guardarEnURL);
+
+  // Día inicial: el de la URL o el próximo sábado, dentro del rango con festivos.
+  const q = new URLSearchParams(location.search);
+  const d = new Date();
+  d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));
+  const f = /^\d{4}-\d{2}-\d{2}$/.test(q.get("fecha") || "") ? q.get("fecha") : iso(new Date(d.getTime() - d.getTimezoneOffset() * 60000));
+  el.fecha.value = f > el.fecha.max ? el.fecha.max : f < el.fecha.min ? el.fecha.min : f;
+  if (q.has("temp")) { el.temp.value = q.get("temp"); el.tempV.textContent = `${el.temp.value} ºC`; }
+  if ([...el.lluvia.options].some(o => o.value === q.get("lluvia"))) el.lluvia.value = q.get("lluvia");
+  el.evento.checked = q.get("evento") === "1";
+
+  despertar().then(ok => ok ? prever() : (el.grafica.innerHTML = `<div class="vacio">El modelo no está disponible ahora mismo. <button type="button" id="reintentar">Reintentar</button></div>`,
+    $("reintentar").addEventListener("click", () => despertar().then(ok2 => ok2 && prever()))));
+})();
+</script>
+</body>
+</html>

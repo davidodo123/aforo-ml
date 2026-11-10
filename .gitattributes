@@ -1,0 +1,2 @@
+# El modelo exportado se guarda byte a byte: LightGBM no lee el árbol con saltos de línea CRLF.
+modelo/** binary
