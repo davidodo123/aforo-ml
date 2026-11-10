@@ -1,5 +1,7 @@
 # aforo-ml
 
+**Demo en vivo:** https://aforo-api.onrender.com (documentación interactiva de la API; la primera carga puede tardar ~1 min si el servicio estaba dormido)
+
 Predicción de **clientes por hora** de un bar-cafetería, con un ciclo de ML en producción completo:
 datos → entrenamiento → registro de modelos → API → Docker → tests y CI.
 

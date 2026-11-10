@@ -13,7 +13,7 @@ Leyenda: [x] hecho · [/] a medias · [ ] pendiente · [-] descartado
 - [x] Log de predicciones en JSONL
 - [x] Dockerfile y docker-compose (MLflow + entrenar + API)
 - [x] Tests con pytest y CI en GitHub Actions
-- [ ] Probar la pila con Docker en el PC (`docker compose`)
+- [ ] Probar la pila con Docker en el PC (`docker compose`) — la CI ya construye ambas imágenes
 - [x] Subir el repo a GitHub
 
 ## Fase 2 · Calidad del modelo
@@ -28,7 +28,7 @@ Leyenda: [x] hecho · [/] a medias · [ ] pendiente · [-] descartado
 
 ## Fase 3 · Producción de verdad
 - [x] Imagen ligera de la API sin MLflow (modelo exportado en `modelo/`) y `render.yaml`
-- [ ] Desplegar la API en Render (falta conectar el repo)
+- [x] Desplegar la API en Render: https://aforo-api.onrender.com
 - [ ] Previsión meteorológica real (AEMET u Open-Meteo) para predecir los próximos 7 días
 - [ ] Endpoint `/predecir/dia` que construya las 16 horas de un día a partir de la previsión
 - [ ] Autenticación por API key y rate limiting
