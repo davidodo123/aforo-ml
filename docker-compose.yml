@@ -1,0 +1,57 @@
+# Pila completa:
+#   docker compose up -d mlflow                     -> servidor MLflow en http://localhost:5000
+#   docker compose --profile entrenar run --rm entrenar -> genera datos, entrena y registra "champion"
+#   docker compose up -d api                        -> API en http://localhost:8000/docs
+services:
+  mlflow:
+    # Misma imagen que la API: cliente y servidor MLflow siempre en la misma versión.
+    build: .
+    user: root
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --serve-artifacts
+      --allowed-hosts "mlflow:5000,localhost:5000,127.0.0.1:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+
+  entrenar:
+    build: .
+    profiles: ["entrenar"]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./datos:/app/datos
+    user: root
+    command: >
+      sh -c "python -m aforo.datos --salida datos/afluencia.csv &&
+             python -m aforo.entrenar --datos datos/afluencia.csv"
+    healthcheck:
+      disable: true
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_URI: models:/aforo@champion
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+volumes:
+  mlflow-data:
