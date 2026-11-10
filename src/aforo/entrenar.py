@@ -7,7 +7,8 @@ Pasos:
    supera, no merece producción.
 4. LightGBM con objetivo Poisson (adecuado para conteos de clientes).
 5. Registra parámetros, métricas y modelo en MLflow. Si mejora al baseline y al
-   campeón actual, lo marca con el alias "champion" (el que sirve la API).
+   campeón actual (evaluado sobre el mismo test), lo marca con el alias
+   "champion" (el que sirve la API).
 
 Uso:
     python -m aforo.entrenar --datos datos/afluencia.csv
@@ -55,13 +56,24 @@ def predecir_baseline(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
     return np.array([medias.get(k, train["clientes"].mean()) for k in claves])
 
 
-def mae_campeon(cliente: MlflowClient) -> float | None:
+def mae_campeon(X_test: pd.DataFrame, y_test: pd.Series) -> float | None:
+    """MAE del "champion" actual evaluado sobre el MISMO test que el modelo nuevo.
+
+    Comparar con la métrica que el campeón guardó al entrenarse no es justo: si los
+    datos han cambiado, su test era otro periodo. Por eso se vuelve a evaluar aquí.
+    Devuelve None si no hay campeón o si no puede predecir con las features
+    actuales (en ese caso la API tampoco podría servirlo).
+    """
     try:
-        version = cliente.get_model_version_by_alias(NOMBRE_MODELO, "champion")
+        MlflowClient().get_model_version_by_alias(NOMBRE_MODELO, "champion")
     except mlflow.exceptions.MlflowException:
         return None
-    run = cliente.get_run(version.run_id)
-    return run.data.metrics.get("test_mae")
+    try:
+        campeon = mlflow.pyfunc.load_model(f"models:/{NOMBRE_MODELO}@champion")
+        return metricas(y_test, campeon.predict(X_test))["mae"]
+    except Exception as e:
+        print(f"Aviso: no se pudo evaluar el champion actual ({e}); se ignora en la comparación.")
+        return None
 
 
 def entrenar(ruta_datos: str, dias_test: int = 90, params: dict | None = None) -> dict:
@@ -107,6 +119,10 @@ def entrenar(ruta_datos: str, dias_test: int = 90, params: dict | None = None) -
         mlflow.log_metrics({f"test_{k}": v for k, v in res.items()})
         mlflow.log_metric("mejora_vs_baseline_pct", 100 * (1 - res["mae"] / base["mae"]))
 
+        previo = mae_campeon(X_te, y_te)
+        if previo is not None:
+            mlflow.log_metric("campeon_mae_mismo_test", previo)
+
         importancias = pd.Series(modelo.feature_importances_, index=FEATURES).sort_values(ascending=False)
         mlflow.log_dict(importancias.to_dict(), "importancia_features.json")
 
@@ -120,7 +136,6 @@ def entrenar(ruta_datos: str, dias_test: int = 90, params: dict | None = None) -
 
         cliente = MlflowClient()
         version = info.registered_model_version
-        previo = mae_campeon(cliente)
         supera_baseline = res["mae"] < base["mae"]
         supera_campeon = previo is None or res["mae"] < previo
         promovido = supera_baseline and supera_campeon
@@ -134,7 +149,7 @@ def entrenar(ruta_datos: str, dias_test: int = 90, params: dict | None = None) -
         "baseline_mae": round(base["mae"], 2),
         "test_mae": round(res["mae"], 2),
         "test_wape": round(res["wape"], 4),
-        "mae_campeon_anterior": previo,
+        "mae_campeon_anterior": None if previo is None else round(previo, 2),
         "promovido": promovido,
     }
     return resumen

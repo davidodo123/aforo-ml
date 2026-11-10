@@ -76,6 +76,9 @@ POST /predecir
 ## Limitaciones conocidas
 
 - Los árboles no extrapolan la tendencia: para fechas posteriores a los datos, el crecimiento se queda plano.
-- Los festivos están en `festivos.py` solo para 2024-2026.
+  La API lo indica en el campo `avisos` de la respuesta.
+- Los festivos están en `festivos.py` solo para 2024-2026; la API rechaza (422) fechas de otros años.
+- Para decidir si un modelo nuevo pasa a `champion`, el campeón actual se reevalúa sobre el mismo test,
+  así la comparación es justa aunque los datos hayan cambiado.
 
 Plan completo en [`diario/Roadmap.md`](diario/Roadmap.md).

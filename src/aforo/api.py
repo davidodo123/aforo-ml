@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from aforo import __version__
 from aforo.features import HORA_APERTURA, HORA_CIERRE, construir_features
+from aforo.festivos import ANIOS_CUBIERTOS
 
 log = logging.getLogger("aforo.api")
 
@@ -41,6 +42,11 @@ class Hora(BaseModel):
     def dentro_de_horario(cls, v: datetime) -> datetime:
         if not HORA_APERTURA <= v.hour < HORA_CIERRE:
             raise ValueError(f"El local abre de {HORA_APERTURA}:00 a {HORA_CIERRE - 1}:59")
+        if v.year not in ANIOS_CUBIERTOS:
+            raise ValueError(
+                f"No hay festivos cargados para {v.year} (años disponibles: "
+                f"{min(ANIOS_CUBIERTOS)}-{max(ANIOS_CUBIERTOS)}); añádelos en festivos.py"
+            )
         return v
 
 
@@ -56,6 +62,7 @@ class Prediccion(BaseModel):
 class Respuesta(BaseModel):
     modelo: str
     predicciones: list[Prediccion]
+    avisos: list[str] = []
 
 
 def cargar_modelo(uri: str) -> tuple[Any, dict]:
@@ -63,8 +70,28 @@ def cargar_modelo(uri: str) -> tuple[Any, dict]:
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
     modelo = mlflow.pyfunc.load_model(uri)
-    meta = {"uri": uri, "run_id": modelo.metadata.run_id}
+    run_id = modelo.metadata.run_id
+    meta = {"uri": uri, "run_id": run_id}
+    try:  # hasta qué fecha vio datos el modelo, para avisar de extrapolaciones
+        meta["train_hasta"] = mlflow.MlflowClient().get_run(run_id).data.params.get("train_hasta")
+    except Exception as e:
+        log.warning("No se pudo leer train_hasta del run %s: %s", run_id, e)
     return modelo, meta
+
+
+def avisos_extrapolacion(horas: list[datetime], meta: dict) -> list[str]:
+    """Los árboles no extrapolan la tendencia: avisa si se pide más allá del entrenamiento."""
+    if not meta.get("train_hasta"):
+        return []
+    limite = pd.Timestamp(meta["train_hasta"])
+    fuera = sum(pd.Timestamp(h).replace(tzinfo=None) > limite for h in horas)
+    if not fuera:
+        return []
+    return [
+        f"{fuera} de {len(horas)} horas son posteriores a los datos de entrenamiento "
+        f"({limite:%Y-%m-%d}): la tendencia de crecimiento no se extrapola y la "
+        "predicción puede quedarse corta."
+    ]
 
 
 def crear_app(modelo: Any = None, meta: dict | None = None) -> FastAPI:
@@ -117,7 +144,11 @@ def crear_app(modelo: Any = None, meta: dict | None = None) -> FastAPI:
             for h, c in zip(p.horas, pred)
         ]
         _guardar_log(p, salida, app.state.meta, ms)
-        return Respuesta(modelo=app.state.meta.get("uri", "desconocido"), predicciones=salida)
+        return Respuesta(
+            modelo=app.state.meta.get("uri", "desconocido"),
+            predicciones=salida,
+            avisos=avisos_extrapolacion([h.fecha_hora for h in p.horas], app.state.meta),
+        )
 
     return app
 

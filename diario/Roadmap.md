@@ -14,9 +14,12 @@ Leyenda: [x] hecho · [/] a medias · [ ] pendiente · [-] descartado
 - [x] Dockerfile y docker-compose (MLflow + entrenar + API)
 - [x] Tests con pytest y CI en GitHub Actions
 - [ ] Probar la pila con Docker en el PC (`docker compose`)
-- [ ] Subir el repo a GitHub
+- [x] Subir el repo a GitHub
 
 ## Fase 2 · Calidad del modelo
+- [x] Promoción justa: el `champion` se reevalúa sobre el mismo test que el modelo nuevo
+- [x] La API rechaza años sin festivos cargados y avisa cuando extrapola más allá del entrenamiento
+- [ ] Reentrenar el modelo final con todos los datos (ahora el `champion` no ve los últimos 90 días)
 - [ ] Validación cruzada temporal (TimeSeriesSplit) en lugar de un solo corte
 - [ ] Búsqueda de hiperparámetros (Optuna) registrada en MLflow
 - [ ] Features de retardo (misma hora hace 7 días, media móvil) y cómo servirlas en la API
