@@ -1,0 +1,7 @@
+# Solo lo necesario para servir el modelo exportado (sin MLflow ni scikit-learn).
+numpy>=2.0,<3
+pandas>=2.2,<4
+lightgbm>=4.5,<5
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7,<3

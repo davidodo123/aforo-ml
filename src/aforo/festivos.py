@@ -24,6 +24,10 @@ FESTIVOS: set[date] = {
     date(2026, 12, 8), date(2026, 12, 25),
 }
 
+# Años con festivos cargados: fuera de ellos las features "festivo" y
+# "vispera_festivo" serían falsas, así que la API rechaza esas fechas.
+ANIOS_CUBIERTOS: frozenset[int] = frozenset(d.year for d in FESTIVOS)
+
 # Días en que el local cierra.
 CERRADO: set[tuple[int, int]] = {(12, 25), (1, 1)}
 

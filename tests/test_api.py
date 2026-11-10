@@ -60,3 +60,31 @@ def test_sin_modelo_da_503(monkeypatch):
         assert c.get("/health").status_code == 503
         r = c.post("/predecir", json={"horas": [{"fecha_hora": "2026-11-14T12:00:00", "temperatura": 20}]})
         assert r.status_code == 503
+
+
+def test_rechaza_anio_sin_festivos(cliente):
+    r = cliente.post("/predecir", json={"horas": [
+        {"fecha_hora": "2031-05-10T12:00:00", "temperatura": 20},
+    ]})
+    assert r.status_code == 422
+    assert "festivos" in r.text
+
+
+def test_avisa_si_extrapola(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_mod, "RUTA_LOG", tmp_path / "pred.jsonl")
+    meta = {"uri": "falso", "run_id": "test", "train_hasta": "2025-12-31 23:00:00"}
+    with TestClient(api_mod.crear_app(ModeloFalso(), meta)) as c:
+        r = c.post("/predecir", json={"horas": [
+            {"fecha_hora": "2025-06-14T21:00:00", "temperatura": 25},
+            {"fecha_hora": "2026-06-14T21:00:00", "temperatura": 25},
+        ]})
+    assert r.status_code == 200
+    avisos = r.json()["avisos"]
+    assert len(avisos) == 1 and avisos[0].startswith("1 de 2 horas")
+
+
+def test_sin_aviso_dentro_del_entrenamiento(cliente):
+    r = cliente.post("/predecir", json={"horas": [
+        {"fecha_hora": "2026-11-14T21:00:00", "temperatura": 15},
+    ]})
+    assert r.json()["avisos"] == []

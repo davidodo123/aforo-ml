@@ -5,7 +5,9 @@
 services:
   mlflow:
     # Misma imagen que la API: cliente y servidor MLflow siempre en la misma versión.
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
     user: root
     command: >
       mlflow server --host 0.0.0.0 --port 5000
@@ -24,7 +26,9 @@ services:
       - mlflow-data:/mlflow
 
   entrenar:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
     profiles: ["entrenar"]
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
@@ -41,7 +45,9 @@ services:
         condition: service_healthy
 
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MODEL_URI: models:/aforo@champion
