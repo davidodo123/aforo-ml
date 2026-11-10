@@ -19,6 +19,7 @@ from typing import Any
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -31,6 +32,9 @@ log = logging.getLogger("aforo.api")
 MODEL_URI = os.getenv("MODEL_URI", "models:/aforo@champion")
 # Si está definida, se carga el modelo exportado (python -m aforo.exportar) sin MLflow.
 MODEL_DIR = os.getenv("MODEL_DIR")
+# Orígenes que pueden llamar a la API desde el navegador (la web de web/), separados por comas.
+# La API es pública y de solo lectura, sin cookies, así que "*" es seguro por defecto.
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 RUTA_LOG = Path(os.getenv("RUTA_LOG_PREDICCIONES", "logs/predicciones.jsonl"))
 
 
@@ -120,6 +124,13 @@ def crear_app(modelo: Any = None, meta: dict | None = None) -> FastAPI:
 
     app = FastAPI(title="Aforo", version=__version__, lifespan=lifespan,
                   description="Predicción de clientes por hora de un local.")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ORIGINS,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+    )
 
     @app.get("/", include_in_schema=False)
     def inicio():
