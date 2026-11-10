@@ -31,7 +31,7 @@ Leyenda: [x] hecho · [/] a medias · [ ] pendiente · [-] descartado
 - [x] Desplegar la API en Render: https://aforo-api.onrender.com
 - [x] Previsión meteorológica real (Open-Meteo) en la web
 - [x] Web estática (`web/`) con la curva de clientes del día, escenarios y CORS en la API
-- [ ] Publicar la web en Vercel
+- [x] Publicar la web en Vercel: https://aforo-ml-web.vercel.app
 - [ ] Endpoint `/predecir/dia` que construya las 16 horas de un día a partir de la previsión
 - [ ] Autenticación por API key y rate limiting
 
