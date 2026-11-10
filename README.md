@@ -21,7 +21,8 @@ aforo.datos ──► datos/afluencia.csv ──► aforo.entrenar ──► MLf
 |---|---|
 | `src/aforo/datos.py` | Genera y limpia los datos sintéticos |
 | `src/aforo/features.py` | Features compartidas por entrenamiento y API |
-| `src/aforo/entrenar.py` | Baseline + LightGBM Poisson, split temporal, registro en MLflow y promoción a `champion` |
+| `src/aforo/modelo.py` | Tendencia log-lineal (regresión de Poisson) × LightGBM Poisson, para que el crecimiento se extrapole |
+| `src/aforo/entrenar.py` | Baseline, evaluación con split temporal, comparación justa con el `champion`, reentrenamiento final con todos los datos y registro en MLflow |
 | `src/aforo/api.py` | API FastAPI que sirve el `champion` |
 
 ## Resultados (test: últimos 90 días de 2025)
@@ -31,6 +32,11 @@ aforo.datos ──► datos/afluencia.csv ──► aforo.entrenar ──► MLf
 | Baseline (media por día y hora) | 5,97 | — |
 | LightGBM Poisson | 4,82 | 15,2 % |
 | LightGBM Poisson, `num_leaves=8` | 4,63 | 14,6 % |
+| Tendencia × LightGBM Poisson | 4,74 | 15,0 % |
+
+El modelo con tendencia separada estima un crecimiento del 9,8 % anual (el generador usa un 10 %).
+Ejemplo, sábado a las 21:00 con evento: el modelo anterior predecía 92 → 91 → 91 clientes en
+2024 → 2025 → 2026; el nuevo, 88 → 97 → 106.
 
 ## Arrancar en local (Windows, PowerShell)
 
@@ -75,10 +81,12 @@ POST /predecir
 
 ## Limitaciones conocidas
 
-- Los árboles no extrapolan la tendencia: para fechas posteriores a los datos, el crecimiento se queda plano.
-  La API lo indica en el campo `avisos` de la respuesta.
+- La tendencia se modela como log-lineal (crecimiento porcentual constante). Para fechas posteriores
+  a los datos se extrapola, y la API lo indica en el campo `avisos` de la respuesta.
+- Con menos de un año de datos no se estima tendencia (se confundiría con la estacionalidad).
 - Los festivos están en `festivos.py` solo para 2024-2026; la API rechaza (422) fechas de otros años.
-- Para decidir si un modelo nuevo pasa a `champion`, el campeón actual se reevalúa sobre el mismo test,
-  así la comparación es justa aunque los datos hayan cambiado.
+- El modelo registrado se reentrena con todos los datos tras evaluarlo. Para decidir si pasa a
+  `champion`, se compara con el actual solo en horas que este no vio; si no las hay, con su MAE
+  guardado cuando los datos y el test son los mismos; y si tampoco, no se promueve automáticamente.
 
 Plan completo en [`diario/Roadmap.md`](diario/Roadmap.md).

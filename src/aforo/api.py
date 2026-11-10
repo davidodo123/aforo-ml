@@ -80,7 +80,7 @@ def cargar_modelo(uri: str) -> tuple[Any, dict]:
 
 
 def avisos_extrapolacion(horas: list[datetime], meta: dict) -> list[str]:
-    """Los árboles no extrapolan la tendencia: avisa si se pide más allá del entrenamiento."""
+    """Avisa si se pide más allá de los datos de entrenamiento (extrapolación)."""
     if not meta.get("train_hasta"):
         return []
     limite = pd.Timestamp(meta["train_hasta"])
@@ -89,8 +89,8 @@ def avisos_extrapolacion(horas: list[datetime], meta: dict) -> list[str]:
         return []
     return [
         f"{fuera} de {len(horas)} horas son posteriores a los datos de entrenamiento "
-        f"({limite:%Y-%m-%d}): la tendencia de crecimiento no se extrapola y la "
-        "predicción puede quedarse corta."
+        f"({limite:%Y-%m-%d}): la tendencia de crecimiento se extrapola y la "
+        "incertidumbre es mayor cuanto más lejos esté la fecha."
     ]
 
 
