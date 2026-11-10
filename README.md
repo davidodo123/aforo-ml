@@ -23,7 +23,8 @@ aforo.datos ──► datos/afluencia.csv ──► aforo.entrenar ──► MLf
 | `src/aforo/features.py` | Features compartidas por entrenamiento y API |
 | `src/aforo/modelo.py` | Tendencia log-lineal (regresión de Poisson) × LightGBM Poisson, para que el crecimiento se extrapole |
 | `src/aforo/entrenar.py` | Baseline, evaluación con split temporal, comparación justa con el `champion`, reentrenamiento final con todos los datos y registro en MLflow |
-| `src/aforo/api.py` | API FastAPI que sirve el `champion` |
+| `src/aforo/api.py` | API FastAPI que sirve el `champion` (desde MLflow o desde `modelo/`) |
+| `src/aforo/exportar.py` | Exporta el `champion` a `modelo/` (árbol LightGBM + `meta.json`) para servirlo sin MLflow |
 
 ## Resultados (test: últimos 90 días de 2025)
 
@@ -66,6 +67,28 @@ Tras reentrenar, la API coge el nuevo `champion` sin reiniciar:
 ```powershell
 curl -X POST http://localhost:8000/recargar
 ```
+
+## Desplegar (imagen ligera, sin MLflow)
+
+Hay dos imágenes:
+
+| Archivo | Para qué | Tamaño aprox. de dependencias |
+|---|---|---|
+| `Dockerfile` | API pública: sirve el modelo exportado en `modelo/` | ~300 MB |
+| `Dockerfile.mlflow` | Pila completa de `docker-compose` (MLflow, entrenar, API) | ~730 MB |
+
+Tras entrenar un modelo mejor, se exporta y se sube al repo:
+
+```powershell
+python -m aforo.exportar --salida modelo
+git add modelo && git commit -m "Nuevo champion" && git push
+```
+
+**Render**: New → Blueprint → elige el repo. `render.yaml` crea el servicio desde el `Dockerfile`
+y cada push a `main` lo redespliega. La raíz `/` redirige a `/docs`.
+
+En el plan gratuito el servicio se duerme tras un rato sin visitas (la primera petición tarda
+unos segundos) y `logs/predicciones.jsonl` se pierde en cada redespliegue.
 
 ## Ejemplo de petición
 

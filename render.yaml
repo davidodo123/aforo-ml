@@ -1,0 +1,9 @@
+# Despliegue en Render: New > Blueprint > elige este repo.
+services:
+  - type: web
+    name: aforo-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true

@@ -27,7 +27,8 @@ Leyenda: [x] hecho · [/] a medias · [ ] pendiente · [-] descartado
 - [ ] Intervalos de predicción (cuantiles) además del valor medio
 
 ## Fase 3 · Producción de verdad
-- [ ] Desplegar la API (Render, Railway o un VPS con Docker)
+- [x] Imagen ligera de la API sin MLflow (modelo exportado en `modelo/`) y `render.yaml`
+- [ ] Desplegar la API en Render (falta conectar el repo)
 - [ ] Previsión meteorológica real (AEMET u Open-Meteo) para predecir los próximos 7 días
 - [ ] Endpoint `/predecir/dia` que construya las 16 horas de un día a partir de la previsión
 - [ ] Autenticación por API key y rate limiting

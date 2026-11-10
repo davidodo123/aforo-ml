@@ -1,0 +1,22 @@
+{
+  "uri": "models:/aforo@champion (v2, exportado)",
+  "run_id": "0444756286004cd9a1021164fc643c05",
+  "version": "2",
+  "train_hasta": "2025-12-31 23:00:00",
+  "pendiente": 0.0931911951609079,
+  "features_arbol": [
+    "hora",
+    "dia_semana",
+    "mes",
+    "dia_del_anio_sin",
+    "dia_del_anio_cos",
+    "fin_de_semana",
+    "festivo",
+    "vispera_festivo",
+    "agosto",
+    "temperatura",
+    "lluvia_mm",
+    "llueve",
+    "evento"
+  ]
+}

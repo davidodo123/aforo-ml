@@ -24,4 +24,5 @@ jobs:
     needs: tests
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t aforo:ci .
+      - run: docker build -t aforo-api:ci .
+      - run: docker build -f Dockerfile.mlflow -t aforo-mlflow:ci .

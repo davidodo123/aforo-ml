@@ -19,6 +19,7 @@ from typing import Any
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field, field_validator
 
 from aforo import __version__
@@ -28,6 +29,8 @@ from aforo.festivos import ANIOS_CUBIERTOS
 log = logging.getLogger("aforo.api")
 
 MODEL_URI = os.getenv("MODEL_URI", "models:/aforo@champion")
+# Si está definida, se carga el modelo exportado (python -m aforo.exportar) sin MLflow.
+MODEL_DIR = os.getenv("MODEL_DIR")
 RUTA_LOG = Path(os.getenv("RUTA_LOG_PREDICCIONES", "logs/predicciones.jsonl"))
 
 
@@ -66,7 +69,14 @@ class Respuesta(BaseModel):
 
 
 def cargar_modelo(uri: str) -> tuple[Any, dict]:
-    import mlflow
+    if MODEL_DIR:
+        from aforo.servir import ModeloExportado
+
+        modelo = ModeloExportado(MODEL_DIR)
+        claves = ("uri", "run_id", "version", "train_hasta")
+        return modelo, {k: modelo.meta.get(k) for k in claves}
+
+    import mlflow  # solo en el modo MLflow: la imagen ligera no lo instala
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
     modelo = mlflow.pyfunc.load_model(uri)
@@ -111,6 +121,10 @@ def crear_app(modelo: Any = None, meta: dict | None = None) -> FastAPI:
     app = FastAPI(title="Aforo", version=__version__, lifespan=lifespan,
                   description="Predicción de clientes por hora de un local.")
 
+    @app.get("/", include_in_schema=False)
+    def inicio():
+        return RedirectResponse("/docs")
+
     @app.get("/health")
     def health():
         if app.state.modelo is None:
@@ -123,7 +137,7 @@ def crear_app(modelo: Any = None, meta: dict | None = None) -> FastAPI:
 
     @app.post("/recargar")
     def recargar():
-        """Vuelve a cargar el "champion" tras un reentrenamiento, sin reiniciar la API."""
+        """Vuelve a cargar el modelo (el "champion" de MLflow o la carpeta exportada) sin reiniciar."""
         try:
             app.state.modelo, app.state.meta = cargar_modelo(MODEL_URI)
         except Exception as e:
